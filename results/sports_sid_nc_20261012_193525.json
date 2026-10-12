@@ -1,0 +1,91 @@
+{
+  "catalog": {
+    "items": 18357,
+    "sid_classes": 17492,
+    "collision_classes": 729,
+    "items_in_collision_classes": 1594,
+    "collision_rate": 0.04712098926839903,
+    "max_class_size": 14
+  },
+  "strata": {
+    "all": {
+      "samples": 35598,
+      "metrics": {
+        "sid_at_item_rank/recall@5": 0.022416989718523513,
+        "sid_at_item_rank/recall@10": 0.03629417382999045,
+        "sid_at_item_rank/ndcg@5": 0.013931940766907326,
+        "sid_at_item_rank/ndcg@10": 0.01838378892272903,
+        "sid_unique/recall@5": 0.022613629979212315,
+        "sid_unique/recall@10": 0.03651890555649194,
+        "sid_unique/ndcg@5": 0.014026366103053932,
+        "sid_unique/ndcg@10": 0.018491292832356006,
+        "item/recall@5": 0.02157424574414293,
+        "item/recall@10": 0.035254789594921065,
+        "item/ndcg@5": 0.013355000674153385,
+        "item/ndcg@10": 0.017748298626531166,
+        "sid_hit_item_miss/recall@5": 0.0008427439743805831,
+        "sid_hit_item_miss/recall@10": 0.001039384235069386
+      }
+    },
+    "collision": {
+      "samples": 3349,
+      "metrics": {
+        "sid_at_item_rank/recall@5": 0.04538668259181845,
+        "sid_at_item_rank/recall@10": 0.06598984771573604,
+        "sid_at_item_rank/ndcg@5": 0.028070368295874244,
+        "sid_at_item_rank/ndcg@10": 0.03466102398259425,
+        "sid_unique/recall@5": 0.04568527918781726,
+        "sid_unique/recall@10": 0.06658704090773365,
+        "sid_unique/ndcg@5": 0.028232752216698024,
+        "sid_unique/ndcg@10": 0.03494162020933407,
+        "item/recall@5": 0.03642878471185428,
+        "item/recall@10": 0.05494177366378023,
+        "item/ndcg@5": 0.02193781725919033,
+        "item/ndcg@10": 0.02790611697630825,
+        "sid_hit_item_miss/recall@5": 0.008957897879964169,
+        "sid_hit_item_miss/recall@10": 0.011048074051955807
+      }
+    },
+    "singleton": {
+      "samples": 32249,
+      "metrics": {
+        "sid_at_item_rank/recall@5": 0.020031628887717447,
+        "sid_at_item_rank/recall@10": 0.033210332103321034,
+        "sid_at_item_rank/ndcg@5": 0.012463690781031425,
+        "sid_at_item_rank/ndcg@10": 0.0166934276645354,
+        "sid_unique/recall@5": 0.020217681168408323,
+        "sid_unique/recall@10": 0.03339638438401191,
+        "sid_unique/ndcg@5": 0.012551058741752934,
+        "sid_unique/ndcg@10": 0.016782956251826457,
+        "item/recall@5": 0.020031628887717447,
+        "item/recall@10": 0.033210332103321034,
+        "item/ndcg@5": 0.012463690781031425,
+        "item/ndcg@10": 0.0166934276645354,
+        "sid_hit_item_miss/recall@5": 0.0,
+        "sid_hit_item_miss/recall@10": 0.0
+      }
+    }
+  },
+  "settings": {
+    "ckpt_dir": "checkpoints_sports",
+    "dataset": "Sports and Outdoors",
+    "device": "cuda:0",
+    "plm_dir": "../LLM/",
+    "plm_name": "t5-base",
+    "tokenizer_plm": "sentence-t5-base",
+    "token_type": "sid_nc",
+    "num_beams": 50,
+    "batch_size": 16,
+    "K": 256,
+    "D": 3,
+    "item_sep": ",",
+    "max_len": 20,
+    "max_sent_len": 512,
+    "add_user_prefix": false,
+    "user_prefix": "<u_{}>",
+    "sid_prefix_len": 3,
+    "metrics": "['recall@5', 'recall@10', 'ndcg@5', 'ndcg@10']",
+    "results_file": "results/sports_sid_nc_20261012_193525.json"
+  },
+  "checkpoint": "checkpoints_sports/sid_nc/Sports and Outdoors_sentence-t5-base/K=256_D=3"
+}

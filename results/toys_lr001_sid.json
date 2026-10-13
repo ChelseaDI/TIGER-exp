@@ -1,0 +1,91 @@
+{
+  "catalog": {
+    "items": 11924,
+    "sid_classes": 11647,
+    "collision_classes": 237,
+    "items_in_collision_classes": 514,
+    "collision_rate": 0.02323045957732306,
+    "max_class_size": 7
+  },
+  "strata": {
+    "all": {
+      "samples": 19412,
+      "metrics": {
+        "sid_at_item_rank/recall@5": 0.03564805275087575,
+        "sid_at_item_rank/recall@10": 0.0568205233875953,
+        "sid_at_item_rank/ndcg@5": 0.022968744777716172,
+        "sid_at_item_rank/ndcg@10": 0.029770977820934,
+        "sid_unique/recall@5": 0.0362147125489388,
+        "sid_unique/recall@10": 0.05733566865856171,
+        "sid_unique/ndcg@5": 0.023262539492051936,
+        "sid_unique/ndcg@10": 0.030036095922564815,
+        "item/recall@5": 0.033381413558623535,
+        "item/recall@10": 0.054553884195343086,
+        "item/ndcg@5": 0.021460137218133793,
+        "item/ndcg@10": 0.02823494471502441,
+        "sid_hit_item_miss/recall@5": 0.002266639192252215,
+        "sid_hit_item_miss/recall@10": 0.002266639192252215
+      }
+    },
+    "collision": {
+      "samples": 885,
+      "metrics": {
+        "sid_at_item_rank/recall@5": 0.1096045197740113,
+        "sid_at_item_rank/recall@10": 0.1694915254237288,
+        "sid_at_item_rank/ndcg@5": 0.07554905852013735,
+        "sid_at_item_rank/ndcg@10": 0.09511810725802124,
+        "sid_unique/recall@5": 0.11073446327683616,
+        "sid_unique/recall@10": 0.17175141242937852,
+        "sid_unique/ndcg@5": 0.07608521706128113,
+        "sid_unique/ndcg@10": 0.0960499847580794,
+        "item/recall@5": 0.059887005649717516,
+        "item/recall@10": 0.11977401129943503,
+        "item/ndcg@5": 0.042458561405320866,
+        "item/ndcg@10": 0.061426045504442875,
+        "sid_hit_item_miss/recall@5": 0.04971751412429379,
+        "sid_hit_item_miss/recall@10": 0.04971751412429379
+      }
+    },
+    "singleton": {
+      "samples": 18527,
+      "metrics": {
+        "sid_at_item_rank/recall@5": 0.032115291196631944,
+        "sid_at_item_rank/recall@10": 0.051438441193933176,
+        "sid_at_item_rank/ndcg@5": 0.020457081925552095,
+        "sid_at_item_rank/ndcg@10": 0.02664946815656186,
+        "sid_unique/recall@5": 0.032655043989852646,
+        "sid_unique/recall@10": 0.051870243428509745,
+        "sid_unique/ndcg@5": 0.020739299374992023,
+        "sid_unique/ndcg@10": 0.026882736413770588,
+        "item/recall@5": 0.032115291196631944,
+        "item/recall@10": 0.051438441193933176,
+        "item/ndcg@5": 0.020457081925552095,
+        "item/ndcg@10": 0.02664946815656186,
+        "sid_hit_item_miss/recall@5": 0.0,
+        "sid_hit_item_miss/recall@10": 0.0
+      }
+    }
+  },
+  "settings": {
+    "ckpt_dir": "checkpoints_toys_lr001_sid",
+    "dataset": "Toys and Games",
+    "device": "cuda:0",
+    "plm_dir": "../LLM/",
+    "plm_name": "t5-base",
+    "tokenizer_plm": "sentence-t5-base",
+    "token_type": "sid_nc",
+    "num_beams": 50,
+    "batch_size": 16,
+    "K": 256,
+    "D": 3,
+    "item_sep": ",",
+    "max_len": 20,
+    "max_sent_len": 512,
+    "add_user_prefix": false,
+    "user_prefix": "<u_{}>",
+    "sid_prefix_len": 3,
+    "metrics": "['recall@5', 'recall@10', 'ndcg@5', 'ndcg@10']",
+    "results_file": "results/toys_lr001_sid.json"
+  },
+  "checkpoint": "checkpoints_toys_lr001_sid/sid_nc/Toys and Games_sentence-t5-base/K=256_D=3"
+}

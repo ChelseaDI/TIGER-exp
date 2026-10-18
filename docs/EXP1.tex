@@ -1,0 +1,87 @@
+% Overleaf 编译器：XeLaTeX
+\documentclass[UTF8,11pt,a4paper]{ctexart}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\ctexset{section={format=\Large\bfseries\raggedright}}
+\pagestyle{plain}
+\begin{document}
+
+\section{EXP1}
+
+\subsection{构造物品的组内相对表示}
+
+保留物品输入 RQ-VAE 前的内容表示 $x_i\in\mathbb R^{d_x}$。设完整 SID 为 $s_i=(s_{i,1},\ldots,s_{i,L})$，按前两个 token 分组：
+\begin{equation}
+ c(i)=(s_{i,1},s_{i,2}),\qquad
+ g_c=\{j\in\mathcal I:c(j)=c\}.
+\end{equation}
+其中，$\mathcal I$ 为物品集，$g_c$ 为前缀 $c$ 对应的语义组。以下用 $g$ 表示一个组，$g(i)$ 表示物品 $i$ 所在组。
+
+计算组均值和物品相对表示：
+\begin{equation}
+ \mu_g=\frac{1}{|g|}\sum_{j\in g}x_j,\qquad
+ r_i=x_i-\mu_{g(i)}.
+\end{equation}
+其中，$|g|$ 为组内物品数，$\mu_g\in\mathbb R^{d_x}$ 为组均值，$r_i\in\mathbb R^{d_x}$ 为物品相对组均值的偏移。
+
+\subsection{按语义组汇总用户历史}
+
+给定预测目标之前的用户交互历史 $H_u=(i_1,\ldots,i_T)$，统计各组的交互位置和次数：
+\begin{equation}
+ \mathcal T_{u,g}=\{t\in\{1,\ldots,T\}:g(i_t)=g\},\qquad
+ n_{u,g}=|\mathcal T_{u,g}|.
+\end{equation}
+对每个有交互的组计算平均偏移：
+\begin{equation}
+ \bar r_{u,g}=\frac{1}{n_{u,g}}
+ \sum_{t\in\mathcal T_{u,g}}r_{i_t},\qquad n_{u,g}>0.
+\end{equation}
+其中，$\bar r_{u,g}$ 为用户的组级决策偏好，由当前样本的历史动态计算。各组分别保留，未交互组不构造组级决策偏好。
+
+\subsection{映射组级决策偏好}
+
+将组级决策偏好映射到 T5 隐藏维度：
+\begin{equation}
+ p_{u,g}=W_r\bar r_{u,g},\qquad
+ W_r\in\mathbb R^{h\times d_x},\quad p_{u,g}\in\mathbb R^h.
+\end{equation}
+其中，$d_x$ 为物品内容表示维度，$h$ 为 T5 隐藏维度，$W_r$ 为各组共享的可训练投影矩阵。
+
+\subsection{训练与解码}
+
+将历史物品转换为 SID token 序列并嵌入，得到 $X_u^{\mathrm{SID}}\in\mathbb R^{N_u\times h}$，其中 $N_u$ 为历史输入的 token 数。仅编码历史输入：
+\begin{equation}
+ Z_u=\operatorname{Encoder}(X_u^{\mathrm{SID}})
+ \in\mathbb R^{N_u\times h}.
+\end{equation}
+
+定义用户历史涉及的语义组集合和组数：
+\begin{equation}
+ \mathcal G_u=\{g:n_{u,g}>0\},\qquad m_u=|\mathcal G_u|.
+\end{equation}
+其中，$m_u$ 是当前用户历史涉及的不同组数，不是数据集总组数。
+
+将投影后的组级决策偏好沿序列维拼接到历史编码结果末尾：
+\begin{equation}
+ \widetilde Z_u=
+ [Z_u;p_{u,g_1}^{\top};\ldots;p_{u,g_{m_u}}^{\top}]
+ \in\mathbb R^{(N_u+m_u)\times h}.
+\end{equation}
+其中，$\widetilde Z_u$ 为 decoder 交叉注意力使用的 memory。逐行追加，补齐时同步拼接原有和追加的 mask，屏蔽补齐位置（当前是按交互组数进行补齐，即批次内用户 max 交互组数）。
+
+生成：
+\begin{equation}
+ P(s_i\mid H_u)=\prod_{\ell=1}^{L}
+ P(s_{i,\ell}\mid s_{i,<\ell},\widetilde Z_u).
+\end{equation}
+其中，$L$ 为完整 SID 长度，$s_{i,<\ell}$ 为此前的 SID token。组级决策偏好从第一个输出 token 起参与交叉注意力。
+
+由 ground truth 的 SID $s^+$ 计算训练损失：
+\begin{equation}
+ \mathcal L_{\mathrm{gen}}=-\sum_{\ell=1}^{L}
+ \log P(s^+_\ell\mid s^+_{<\ell},\widetilde Z_u).
+\end{equation}
+
+组级决策偏好由 target 前的历史计算。推理沿用 TIGER 的生成与搜索规则，保留冲突消解 token，由完整 SID 查表得到具体物品。
+
+\end{document}

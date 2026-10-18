@@ -52,7 +52,7 @@ $\bar r_{u,g}$ 为用户的组级决策偏好。各组分别保留，未交互�
  \mathcal G_u=\{g:n_{u,g}>0\},\qquad m=|\mathcal G_u|,\\
  X_u=[X_u^{\mathrm{SID}};p_{u,g_1},\ldots,p_{u,g_m}].
 \end{gather}
-其中，$X_u^{\mathrm{SID}}$ 为用户历史交互序列，$m$ 为当前用户交互历史中所涉及组数。训练时随机排列组级决策偏好。
+其中，$X_u^{\mathrm{SID}}$ 为用户历史交互序列，$m$ 为当前用户交互历史中所涉及组数。训练、验证和测试时均按 group\_id 升序排列组级决策偏好。
 
 \subsection{训练与解码}
 

@@ -8,7 +8,7 @@ import json
 
 from utils import set_seed, RecDataset, RecCollator, ensure_dir, Trie, prefix_allowed_tokens_fn, \
     setup_logging
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -49,7 +49,21 @@ if __name__ == '__main__':
     parser.add_argument('--metrics', type=str, default="['recall@5', 'recall@10', 'ndcg@5', 'ndcg@10']")
 
     parser.add_argument('--results_file', type=str, default=None, help='Save JSON experiment results')
+    parser.add_argument('--use_group_preferences', action='store_true')
+    parser.add_argument('--group_features', type=str, default=None)
+    parser.add_argument('--group_prefix_len', type=int, default=2)
+
     args = parser.parse_args()
+    if args.use_group_preferences:
+        if not args.group_features:
+            parser.error('--group_features is required for group preferences')
+        if args.token_type != 'sid_nc':
+            parser.error('EXP1 requires sid_nc with full unique item codes')
+        if not 1 <= args.group_prefix_len <= args.D:
+            parser.error('group_prefix_len must be between 1 and D')
+        if args.max_len < 1:
+            parser.error('max_len must be positive')
+
     parse_metrics(args.metrics)
     if args.sid_prefix_len is None:
         args.sid_prefix_len = args.D
@@ -75,9 +89,20 @@ if __name__ == '__main__':
     token_size = f'K={args.K}_D={args.D}'
     ckpt_dir = os.path.join(ckpt_dir, token_size)
 
+    if args.use_group_preferences:
+        ckpt_dir = os.path.join(ckpt_dir, 'exp1')
+    saved_config = AutoConfig.from_pretrained(ckpt_dir)
+    if bool(getattr(saved_config, 'use_group_preferences', False)) != args.use_group_preferences:
+        raise ValueError('Checkpoint and preference switch disagree')
+    if args.use_group_preferences and saved_config.group_prefix_len != args.group_prefix_len:
+        raise ValueError('Checkpoint and group prefix disagree')
     tokenizer = AutoTokenizer.from_pretrained(ckpt_dir)
     # model = AutoModelForSeq2SeqLM.from_pretrained(ckpt_dir, torch_dtype=torch.bfloat16)
-    model = AutoModelForSeq2SeqLM.from_pretrained(ckpt_dir, torch_dtype=torch.float32)
+    if args.use_group_preferences:
+        from preference_t5 import PreferenceT5
+        model = PreferenceT5.from_pretrained(ckpt_dir)
+    else:
+        model = AutoModelForSeq2SeqLM.from_pretrained(ckpt_dir, torch_dtype=torch.float32)
 
     model.to(args.device)
     model.eval()
@@ -116,8 +141,14 @@ if __name__ == '__main__':
             input_ids, attention_mask = input_ids.to(args.device), attention_mask.to(args.device)
 
             # for the meaning of each parameter, please refer to https://huggingface.co/docs/transformers/v4.18.0/en/main_classes/text_generation
+            generation_inputs = {'input_ids': input_ids}
+            if args.use_group_preferences:
+                encoded, attention_mask = model.encode_preferences(
+                    input_ids, attention_mask, batch['group_preferences'].to(args.device),
+                    batch['preference_mask'].to(args.device))
+                generation_inputs = {'encoder_outputs': encoded}
             output = model.generate(
-                input_ids=input_ids,
+                **generation_inputs,
                 attention_mask=attention_mask,
                 max_new_tokens=max(len(ids) for ids in candidate_ids),
                 num_beams=args.num_beams,
@@ -134,6 +165,7 @@ if __name__ == '__main__':
             scores = output['sequences_scores']
 
             predictions = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+            targets = targets.masked_fill(targets == -100, tokenizer.pad_token_id)
             targets = tokenizer.batch_decode(targets, skip_special_tokens=True)
 
             scores = scores.detach().tolist()

@@ -12,6 +12,7 @@ import html
 import re
 import logging
 import sys
+from group_preference import GroupPreference
 
 
 # 字典树
@@ -135,6 +136,12 @@ class RecCollator(object):
         input_ids = [one_data['input_ids'] for one_data in batch]
         labels = [one_data['labels'] for one_data in batch]
 
+        has_preferences = 'group_preferences' in batch[0]
+        if has_preferences:
+            lengths = [len(ids) for ids in self.tokenizer(input_ids, truncation=False)['input_ids']]
+            if max(lengths) > self.max_sent_len:
+                raise ValueError('SID history exceeds max_sent_len; increase it or reduce max_len')
+
         inputs = self.tokenizer(text=input_ids,
                                 text_target=labels,
                                 return_tensors='pt',
@@ -143,6 +150,18 @@ class RecCollator(object):
                                 truncation=True,
                                 return_attention_mask=True)
 
+        inputs['labels'][inputs['labels'] == self.tokenizer.pad_token_id] = -100
+        if has_preferences:
+            preferences = [sample['group_preferences'] for sample in batch]
+            width = max(len(value) for value in preferences)
+            values = torch.zeros(len(batch), width, preferences[0].shape[1])
+            mask = torch.zeros(len(batch), width, dtype=torch.long)
+            for row, value in enumerate(preferences):
+                # Preserve the ascending group-ID order from aggregation.
+                values[row, :len(value)] = value
+                mask[row, :len(value)] = 1
+            inputs['group_preferences'] = values
+            inputs['preference_mask'] = mask
         return inputs
 
 
@@ -169,6 +188,10 @@ class RecDataset(Dataset):
         self.sid_catalog, self.sid_class_sizes, self.collision_stats = build_catalog(
             self.indices, self.D, self.token_type)
         logging.info("SID catalog: %s", self.collision_stats)
+        self.group_preference = None
+        if getattr(args, 'use_group_preferences', False):
+            self.group_preference = GroupPreference(
+                args.group_features, self.indices, args.group_prefix_len)
         self._id2token()
 
         if mode == 'train':
@@ -255,6 +278,7 @@ class RecDataset(Dataset):
             if self.add_user_prefix:
                 user_prefix = self.user_prefix.format(user)
             train = seq[:-2]
+            raw_train = self.inter_data[user][:-2]
             for i in range(1, len(train)):
                 one_data = dict()
                 history, target = train[:i], train[i]
@@ -267,6 +291,7 @@ class RecDataset(Dataset):
                 # transform list to str using separation
                 one_data['history'] = self.item_sep.join(history)
                 one_data['target'] = target
+                one_data['raw_history'] = raw_train[:i][-self.max_len:]
                 data.append(one_data)
 
         return data
@@ -279,13 +304,14 @@ class RecDataset(Dataset):
             if self.add_user_prefix:
                 user_prefix = self.user_prefix.format(user)
             one_data = dict()
-            history, target = seq[-self.max_len:-2], seq[-2]
+            history, target = seq[:-2][-self.max_len:], seq[-2]
 
             if self.add_user_prefix:
                 history = [user_prefix] + history
 
             one_data['history'] = self.item_sep.join(history)
             one_data['target'] = target
+            one_data['raw_history'] = self.inter_data[user][:-2][-self.max_len:]
             data.append(one_data)
 
         return data
@@ -298,13 +324,14 @@ class RecDataset(Dataset):
             if self.add_user_prefix:
                 user_prefix = self.user_prefix.format(user)
             one_data = dict()
-            history, target = seq[-self.max_len:-1], seq[-1]
+            history, target = seq[:-1][-self.max_len:], seq[-1]
 
             if self.add_user_prefix:
                 history = [user_prefix] + history
 
             one_data['history'] = self.item_sep.join(history)
             one_data['target'] = target
+            one_data['raw_history'] = self.inter_data[user][:-1][-self.max_len:]
             data.append(one_data)
 
         return data
@@ -314,10 +341,10 @@ class RecDataset(Dataset):
         data = self.data[index]
 
         # key must be 'input_ids' & 'labels' for huggingface to classify
-        return {
-            'input_ids': data['history'],
-            'labels': data['target']
-        }
+        result = {'input_ids': data['history'], 'labels': data['target']}
+        if self.group_preference is not None:
+            result['group_preferences'] = self.group_preference.aggregate(data['raw_history'])
+        return result
 
     def __len__(self):
         return len(self.data)

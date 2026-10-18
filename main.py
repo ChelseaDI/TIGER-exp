@@ -20,6 +20,11 @@ def parse_bool(value):
 
 
 class FiniteLossTrainer(Seq2SeqTrainer):
+    def _save(self, output_dir=None, state_dict=None):
+        super()._save(output_dir, state_dict)
+        # Trainer saves plain nn.Module weights; also preserve its T5 config.
+        self.model.config.save_pretrained(output_dir or self.args.output_dir)
+
     def compute_loss(self, model, inputs, return_outputs=False):
         loss, outputs = super().compute_loss(model, inputs, return_outputs=True)
         if not torch.isfinite(loss).all():
@@ -66,7 +71,21 @@ if __name__ == '__main__':
     parser.add_argument('--max_len', type=int, default=20, help='max length of user interation sequence')
     parser.add_argument('--max_sent_len', type=int, default=512, help='max length of model input sequence')
 
+    parser.add_argument('--use_group_preferences', action='store_true')
+    parser.add_argument('--group_features', type=str, default=None)
+    parser.add_argument('--group_prefix_len', type=int, default=2)
+
     args = parser.parse_args()
+    if args.use_group_preferences:
+        if not args.group_features:
+            parser.error('--group_features is required for group preferences')
+        if args.token_type != 'sid_nc':
+            parser.error('EXP1 requires sid_nc with full unique item codes')
+        if not 1 <= args.group_prefix_len <= args.D:
+            parser.error('group_prefix_len must be between 1 and D')
+        if args.max_len < 1:
+            parser.error('max_len must be positive')
+
     if args.precision is not None and args.bf16 is not None:
         parser.error('Use either --precision or --bf16, not both')
     args.precision = args.precision or ('bf16' if args.bf16 else 'fp32')
@@ -86,6 +105,8 @@ if __name__ == '__main__':
     output_dir = os.path.join(output_dir, dataset_name)
     token_size = f'K={args.K}_D={args.D}'
     output_dir = os.path.join(output_dir, token_size)
+    if args.use_group_preferences:
+        output_dir = os.path.join(output_dir, 'exp1')
     ensure_dir(output_dir)
 
     # load data
@@ -102,17 +123,27 @@ if __name__ == '__main__':
     config = AutoConfig.from_pretrained(model_path)
     config.vocab_size = len(tokenizer)
 
+    if args.use_group_preferences:
+        config.content_dim = train_dataset.group_preference.content_dim
+        config.group_prefix_len = args.group_prefix_len
+        config.use_group_preferences = True
+
     # if process number is 0, save new config & tokenizer(avoid duplication)
     if local_rank == 0:
         tokenizer.save_pretrained(output_dir)
         config.save_pretrained(output_dir)
 
+    # Load the local pretrained T5 first, exactly as in the baseline.
     model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
-    # the newly added tokens will be initialized
     model.resize_token_embeddings(len(tokenizer))
+    if args.use_group_preferences:
+        from preference_t5 import PreferenceT5
+        model = PreferenceT5(model, train_dataset.group_preference.content_dim)
+        model.config.group_prefix_len = args.group_prefix_len
 
     # print(model)
 
+    # Training and validation share the same fixed group order.
     collator = RecCollator(args, tokenizer=tokenizer)
 
     # logger
@@ -124,6 +155,7 @@ if __name__ == '__main__':
     # train
     training_args = Seq2SeqTrainingArguments(output_dir=output_dir,
                                              seed=2024,
+                                             remove_unused_columns=False,
                                              disable_tqdm=True,
                                              per_device_train_batch_size=args.batch_size,
                                              per_device_eval_batch_size=args.batch_size,
